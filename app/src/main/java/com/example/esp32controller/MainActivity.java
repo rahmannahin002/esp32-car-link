@@ -1,5 +1,9 @@
 package com.example.esp32controller;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import android.bluetooth.*;
 import android.os.Bundle;
 import android.view.*;
@@ -28,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        askPermissions();
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -37,6 +42,11 @@ public class MainActivity extends AppCompatActivity {
         speedText = findViewById(R.id.speedText);
 
         adapter = BluetoothAdapter.getDefaultAdapter();
+
+        if (adapter == null) {
+            statusText.setText("Bluetooth not supported");
+            return;
+        }
 
         loadDevices();
 
@@ -52,6 +62,18 @@ public class MainActivity extends AppCompatActivity {
         }
 
         deviceList.setAdapter(list);
+    }
+
+    private void askPermissions() {
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+    
+            ActivityCompat.requestPermissions(this,
+                    new String[]{
+                            Manifest.permission.BLUETOOTH_CONNECT,
+                            Manifest.permission.BLUETOOTH_SCAN
+                    }, 1);
+        }
     }
 
     private void connectSelectedDevice() {
