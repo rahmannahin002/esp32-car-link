@@ -3,21 +3,14 @@ plugins {
 }
 
 android {
-    namespace 'com.example.esp32controller'
-    compileSdk 33
+    compileSdk 35 // Ensure this is high enough for Android 16/15 APIs
 
     defaultConfig {
         applicationId "com.example.esp32controller"
-        minSdk 21
-        targetSdk 33
+        minSdk 24
+        targetSdk 35 
         versionCode 1
         versionName "1.0"
-    }
-
-    buildTypes {
-        debug {
-            debuggable true
-        }
     }
 }
 
