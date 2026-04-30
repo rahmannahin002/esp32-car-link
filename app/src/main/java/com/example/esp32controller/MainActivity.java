@@ -7,6 +7,10 @@ import android.bluetooth.BluetoothSocket;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.InputDevice;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,57 +20,62 @@ import java.io.OutputStream;
 import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int PERMISSION_REQUEST_CODE = 101;
-    private BluetoothAdapter bluetoothAdapter;
-    private BluetoothSocket socket;
-    private OutputStream outputStream;
-    // Standard HC-05/ESP32 SPP UUID
-    private static final UUID MODULE_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    private static final String TAG = "ESPCarLink";
+    private static final int BT_PERMISSION_CODE = 101;
+    private BluetoothAdapter btAdapter;
+    private BluetoothSocket btSocket;
+    private OutputStream outStream;
+    
+    // Default SPP UUID for HC-05/ESP32
+    private static final UUID ESP32_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedIdentifier);
-        setContentView(R.layout.activity_main);
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main); // Ensure this file exists
 
-        // 1. Check Permissions FIRST to avoid immediate crash
-        checkAndRequestPermissions();
+        checkPermissions();
     }
 
-    private void checkAndRequestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { // Android 12+
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
-                ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                
-                ActivityCompat.requestPermissions(this, 
-                    new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION}, 
-                    PERMISSION_REQUEST_CODE);
-                return;
-            }
+    private void checkPermissions() {
+        // Required for Android 12 through Android 16
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            }, BT_PERMISSION_CODE);
+        } else {
+            initBluetooth();
         }
-        initBluetooth();
     }
 
     private void initBluetooth() {
-        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (bluetoothAdapter == null) {
-            Toast.makeText(this, "Bluetooth not supported on this device", Toast.LENGTH_LONG).show();
-            return;
-        }
-        
-        if (!bluetoothAdapter.isEnabled()) {
-            Toast.makeText(this, "Please enable Bluetooth and restart", Toast.LENGTH_SHORT).show();
+        btAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (btAdapter == null) {
+            Toast.makeText(this, "Bluetooth not supported", Toast.LENGTH_LONG).show();
         }
     }
 
-    // Call this method when a button is pressed or controller input is received
-    private void sendData(String data) {
-        new Thread(() -> { // Run in background thread to avoid ANR crash
+    // Capture Game Controller Button Presses
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if ((event.getSource() & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD) {
+            sendDataToESP32("BTN_" + keyCode);
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    private void sendDataToESP32(String message) {
+        new Thread(() -> {
             try {
-                if (outputStream != null) {
-                    outputStream.write(data.getBytes());
+                if (outStream != null) {
+                    outStream.write(message.getBytes());
+                    Log.d(TAG, "Sent: " + message);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.e(TAG, "Send Error", e);
             }
         }).start();
     }
@@ -74,12 +83,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                initBluetooth();
-            } else {
-                Toast.makeText(this, "Permissions required for ESP32 connection", Toast.LENGTH_SHORT).show();
-            }
+        if (requestCode == BT_PERMISSION_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            initBluetooth();
         }
     }
 }
