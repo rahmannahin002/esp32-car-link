@@ -32,7 +32,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        askPermissions();
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -48,20 +47,31 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        loadDevices();
+        askPermissions();   // ask first, DON'T load devices yet
 
         connectBtn.setOnClickListener(v -> connectSelectedDevice());
     }
 
     private void loadDevices() {
-        Set<BluetoothDevice> devices = adapter.getBondedDevices();
-        ArrayAdapter<String> list = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item);
-
-        for (BluetoothDevice d : devices) {
-            list.add(d.getName() + "\n" + d.getAddress());
+        try {
+            Set<BluetoothDevice> devices = adapter.getBondedDevices();
+    
+            if (devices == null || devices.size() == 0) {
+                statusText.setText("No paired devices");
+                return;
+            }
+    
+            ArrayAdapter<String> list = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item);
+    
+            for (BluetoothDevice d : devices) {
+                list.add(d.getName() + "\n" + d.getAddress());
+            }
+    
+            deviceList.setAdapter(list);
+    
+        } catch (Exception e) {
+            statusText.setText("Device load error");
         }
-
-        deviceList.setAdapter(list);
     }
 
     private void askPermissions() {
@@ -75,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
                     }, 1);
         }
     }
-
+    
     private void connectSelectedDevice() {
         try {
             String info = deviceList.getSelectedItem().toString();
@@ -96,7 +106,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == 1) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                loadDevices();   // now safe
+            } else {
+                statusText.setText("Permission denied");
+            }
+        }
+    }
+
+    @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
+
+        if (event == null) return false;
 
         if ((event.getSource() & InputDevice.SOURCE_JOYSTICK) ==
                 InputDevice.SOURCE_JOYSTICK) {
@@ -113,7 +138,8 @@ public class MainActivity extends AppCompatActivity {
             sendData();
             return true;
         }
-        return super.onGenericMotionEvent(event);
+
+        return false;
     }
 
     @Override
